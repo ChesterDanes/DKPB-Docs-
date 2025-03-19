@@ -10,11 +10,13 @@ namespace BLL.DTOModels.RequestsDTO
     {
         public int UserID { get;}
         public DateTime Date { get;}
+        public decimal Value { get;}
 
-        public OrderRequestDTO(int userID, DateTime date)
+        public OrderRequestDTO(int userID, DateTime date, decimal value)
         {
             UserID = userID;
             Date = date;
+            Value = value;
         }
     }
 }

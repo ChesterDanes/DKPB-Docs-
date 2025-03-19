@@ -9,11 +9,11 @@ namespace BLL.DTOModels.RequestsDTO
     public class OrderPositionRequestDTO
     {
         public string ProductName { get; }
-        public double Price { get; }
+        public decimal Price { get; }
         public int Amount { get; }
-        public double Value { get; }
+        public decimal Value { get; }
 
-        public OrderPositionRequestDTO(string productName, double price, int amount, double value)
+        public OrderPositionRequestDTO(string productName, decimal price, int amount, decimal value)
         {
             ProductName = productName;
             Price = price;

@@ -65,18 +65,10 @@ namespace Cw2.Controllers
         [HttpPost("pay/{orderId}")]
         public async Task<IActionResult> PayOrder(int orderId, [FromQuery] string amountPaid)
         {
-            System.Diagnostics.Trace.WriteLine(amountPaid);
-            System.Diagnostics.Trace.WriteLine(Convert.ToDecimal(amountPaid));
             decimal amount = Convert.ToDecimal(amountPaid);
-            System.Diagnostics.Trace.WriteLine(amount);
-            await _orderService.PayOrderAsync(orderId, amount);
+            var paymentResult = await _orderService.PayOrderAsync(orderId, amount);
 
-            return Ok("Zamówienie zostało opłacone.");
-        }
-
-        public class PayOrderRequest
-        {
-            public decimal AmountPaid { get; set; }
+            return paymentResult? Ok("Zamówienie zostało opłacone.") : Ok("Błąd płatności. Sprawdź szczegóły zamówienia");
         }
     }
 }

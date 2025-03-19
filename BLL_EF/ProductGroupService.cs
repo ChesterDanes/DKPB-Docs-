@@ -29,74 +29,58 @@ namespace BLL_EF
             string sortBy = "Name",
             bool ascending = true)
         {
-            var query = _context.ProductGroups.AsQueryable();
+            // Pobranie wszystkich grup z bazy do pamięci (bez wywoływania BuildFullPath w LINQ)
+            var allGroups = await _context.ProductGroups.ToListAsync();
 
-            string path = "";
+            // Słownik dla szybszego dostępu do grup
+            var groupDict = allGroups.ToDictionary(pg => pg.ID);
+
+            // Wybieranie odpowiednich grup
+            var selectedGroups = allGroups.AsQueryable();
 
             if (topGroups)
             {
-                query = query.Where(pg => pg.ParentId == null);
+                selectedGroups = selectedGroups.Where(pg => pg.ParentId == null);
             }
 
             if (groupId.HasValue)
             {
-                
-                var group = await query.Where(pg => pg.ID==groupId).Select(pg => new ProductGroupResponseDTO
-                (
-                    pg.ID,
-                    pg.Name,
-                    pg.ParentId,
-                    path
-                )).ToListAsync();
-
-                path = group.First().Name;
-
-                while (group.First().ParentId!=null)
-                {
-                    group = await query.Where(pg => pg.ID == group.First().ParentId).Select(pg => new ProductGroupResponseDTO
-                        (
-                            pg.ID,
-                            pg.Name,
-                            pg.ParentId,
-                            path
-                        )).ToListAsync();
-                    path = group.First().Name+"/"+path;
-                }
-
-                query = query.Where(pg => pg.ID == groupId);
+                selectedGroups = selectedGroups.Where(pg => pg.ID == groupId || pg.ParentId == groupId);
             }
 
-            if (ascending)
+            // Zamiana na listę przed wywołaniem BuildFullPath (unikanie błędu CS8110)
+            var selectedGroupsList = selectedGroups.ToList();
+
+            // Mapowanie do DTO z pełną ścieżką
+            var dtoList = selectedGroupsList.Select(pg => new ProductGroupResponseDTO
+            (
+                pg.ID,
+                pg.Name,
+                pg.ParentId,
+                BuildFullPath(pg, groupDict) // Teraz działa poprawnie!
+            )).ToList();
+
+            // Sortowanie
+            dtoList = sortBy switch
             {
-                query = sortBy switch
-                {
-                    "Name" => query.OrderBy(pg => pg.Name),
-                    "ID" => query.OrderBy(pg => pg.ID),
-                    _ => query.OrderBy(pg => pg.Name),
-                };
-            }
-            else
+                "Name" => ascending ? dtoList.OrderBy(dto => dto.Path).ToList() : dtoList.OrderByDescending(dto => dto.Path).ToList(),
+                "ID" => ascending ? dtoList.OrderBy(dto => dto.ID).ToList() : dtoList.OrderByDescending(dto => dto.ID).ToList(),
+                _ => dtoList.OrderBy(dto => dto.Path).ToList()
+            };
+
+            return dtoList;
+        }
+
+        // Przeniesiona metoda BuildFullPath
+        private string BuildFullPath(ProductGroup group, Dictionary<int, ProductGroup> groupDict)
+        {
+            var pathSegments = new List<string>();
+            while (group != null)
             {
-                query = sortBy switch
-                {
-                    "Name" => query.OrderByDescending(pg => pg.Name),
-                    "ID" => query.OrderByDescending(pg => pg.ID),
-                    _ => query.OrderByDescending(pg => pg.Name),
-                };
+                pathSegments.Insert(0, group.Name);
+                group = group.ParentId.HasValue ? groupDict.GetValueOrDefault(group.ParentId.Value) : null;
             }
-
-            // Pobieranie danych i mapowanie na DTO
-            var groups = await query
-                .Select(pg => new ProductGroupResponseDTO
-                (
-                    pg.ID,
-                    pg.Name,
-                    pg.ParentId,
-                    path
-                ))
-                .ToListAsync();
-
-            return groups;
+            return string.Join("/", pathSegments);
         }
 
         // Metoda do dodawania nowej grupy produktów

@@ -10,12 +10,12 @@ namespace BLL.DTOModels.ResponseDTO
     {
         public int ID { get;}
         public string Name { get; }
-        public double Price { get; }
+        public decimal Price { get; }
         public string Image { get; }
         public bool IsActive { get; }
         public string GroupName { get; }
 
-        public ProductResponseDTO(int id,string name, double price, string image, bool isActive, string groupName)
+        public ProductResponseDTO(int id,string name, decimal price, string image, bool isActive, string groupName)
         {
             ID = id;
             Name = name;

@@ -19,9 +19,10 @@ namespace Model
         public bool IsPaid { get; set; }
         [Required]
         public DateTime Date { get; set; }
+        public decimal Value { get; set; }
 
         [ForeignKey(nameof(UserID))]
         public User User { get; set; }
-        public ICollection<OrderPosition> OrderPositions { get;}
+        public ICollection<OrderPosition> OrderPositions { get; set; }
     }
 }

@@ -9,12 +9,12 @@ namespace BLL.DTOModels
     public class ProductRequestDTO
     {
         public string Name { get;}
-        public double Price { get; }
+        public decimal Price { get; }
         public string Image { get;}
         public bool IsActive { get;}
         public int? GroupID { get;}
 
-        public ProductRequestDTO(string name, double price, string image, bool isActive, int? groupID)
+        public ProductRequestDTO(string name, decimal price, string image, bool isActive, int? groupID)
         {
             Name = name;
             Price = price;

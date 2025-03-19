@@ -19,6 +19,6 @@ namespace BLL.ServiceInterfaces.Interfaces
 
         Task<OrderResponseDTO> GenerateOrderAsync(int userId);
 
-        Task PayOrderAsync(int orderId, decimal amountPaid);
+        Task<bool> PayOrderAsync(int orderId, decimal amountPaid);
     }
 }

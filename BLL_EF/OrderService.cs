@@ -148,29 +148,42 @@ namespace BLL_EF
                 newOrder.Date
             );
         }
-        public async Task PayOrderAsync(int orderId, decimal amountPaid)
+        public async Task<bool> PayOrderAsync(int orderId, decimal amountPaid)
         {
             var order = await _context.Orders.FindAsync(orderId);
+
+            if (order == null)
+            {
+                // Jeśli zamówienie nie istnieje, zwracamy false
+                return false;
+            }
+
             var orderPosition = await _context.OrderPositions
-                .Where(op => op.OrderID == orderId)
-                .Select(op => new OrderPositionResponseDTO
-                (
-                    op.Product.Name,
-                    op.Price,
-                    op.Amount,
-                    op.Amount * op.Price
-                ))
-                .ToListAsync();
+            .Where(op => op.OrderID == orderId)
+            .Select(op => new OrderPositionResponseDTO
+            (
+            op.Product.Name,
+            op.Price,
+            op.Amount,
+            op.Amount * op.Price
+            ))
+            .ToListAsync();
 
-            System.Diagnostics.Trace.WriteLine(orderPosition.Sum(op => (decimal)op.Price * op.Amount));
-            //System.Diagnostics.Trace.WriteLine(order.OrderPositions.First().Amount);
+            // Sprawdzamy, czy zamówienie nie jest już opłacone
+            if (order.IsPaid)
+            {
+                return false; // Zamówienie już zostało opłacone
+            }
 
-            if (order != null && amountPaid >= orderPosition.Sum(op => (decimal)op.Price*op.Amount))
+            // Sprawdzamy, czy zapłacona kwota zgadza się z wartością zamówienia
+            if (amountPaid == orderPosition.Sum(op => op.Price * op.Amount))
             {
                 order.IsPaid = true;
-                
                 await _context.SaveChangesAsync();
+                return true; // Płatność pomyślna
             }
+
+            return false; // Błąd płatności, zapłacona kwota się nie zgadza
         }
     }
 }

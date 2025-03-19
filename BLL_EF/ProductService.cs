@@ -22,23 +22,22 @@ namespace BLL_EF
         }
 
         public async Task<List<ProductResponseDTO>> GetProductsAsync(
-            string? nameFilter = null,
-            string? groupNameFilter = null,
-            int? groupIdFilter = null,
-            bool includeInactive = false,
-            string sortBy = "Name",
-            bool ascending = true)
+    string? nameFilter = null,
+    string? groupNameFilter = null,
+    int? groupIdFilter = null,
+    bool includeInactive = false,
+    string sortBy = "Name",
+    bool ascending = true)
         {
             var query = _context.Products
                 .AsNoTracking()
                 .Include(p => p.ProductGroup)
+                .ThenInclude(pg => pg.ParentGroup)
+                .ThenInclude(pg => pg.ParentGroup)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(nameFilter))
                 query = query.Where(p => p.Name.Contains(nameFilter));
-
-            if (!string.IsNullOrEmpty(groupNameFilter))
-                query = query.Where(p => p.ProductGroup.Name.Contains(groupNameFilter));
 
             if (groupIdFilter.HasValue)
                 query = query.Where(p => p.GroupID == groupIdFilter.Value);
@@ -56,15 +55,40 @@ namespace BLL_EF
 
             var products = await query.ToListAsync();
 
+            if (!string.IsNullOrEmpty(groupNameFilter))
+            {
+                products = products
+                    .Where(p => BuildFullPath(p.ProductGroup)
+                        .Split('/')
+                        .Any(segment => segment.Contains(groupNameFilter, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+            }
+
             return products.Select(p => new ProductResponseDTO(
                 p.ID,
                 p.Name,
                 p.Price,
                 p.Image,
                 p.IsActive,
-                p.ProductGroup.Name
+                BuildFullPath(p.ProductGroup)
             )).ToList();
         }
+
+        private string BuildFullPath(ProductGroup group)
+        {
+            if (group == null) return string.Empty;
+
+            var pathSegments = new List<string>();
+
+            while (group != null)
+            {
+                pathSegments.Insert(0, group.Name);
+                group = group.ParentGroup;
+            }
+
+            return string.Join("/", pathSegments);
+        }
+
 
         public async Task AddProductAsync(ProductRequestDTO productRequest)
         {
@@ -118,14 +142,25 @@ namespace BLL_EF
 
             if (product != null && user != null)
             {
-                var basketPosition = new BasketPosition
-                {
-                    ProductID = productId,
-                    UserID = userId,
-                    Amount = amount
-                };
+                var existingBasketPosition = await _context.BasketPositions
+                .FirstOrDefaultAsync(bp => bp.UserID == userId && bp.ProductID == productId);
 
-                _context.BasketPositions.Add(basketPosition);
+                if (existingBasketPosition != null)
+                {
+                    existingBasketPosition.Amount += amount;
+                }
+                else
+                {
+                    var basketPosition = new BasketPosition
+                    {
+                        ProductID = productId,
+                        UserID = userId,
+                        Amount = amount
+                    };
+
+                    _context.BasketPositions.Add(basketPosition);
+                }
+
                 await _context.SaveChangesAsync();
             }
         }
