@@ -3,7 +3,8 @@ using BLL.ServiceInterfaces.Interfaces;
 using BLL_EF;
 using DAL;
 using System.Globalization;
-
+using BLL_DB.Services;
+using BLL.Services;
 namespace Cw2
 {
     public class Program
@@ -16,11 +17,12 @@ namespace Cw2
             // Add services to the container.
             builder.Services.AddControllersWithViews();
             builder.Services.AddDbContext<WebstoreContext>();
-            builder.Services.AddScoped<IProductService, ProductService>();
+           // builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IUserService, UserService>();
-            builder.Services.AddScoped<OrderService>();
+           // builder.Services.AddScoped<IOrderService, OrderService>();
             builder.Services.AddScoped<IProductGroupService,ProductGroupService>();
-
+            builder.Services.AddScoped<IOrderService, OrderServiceDB>();
+            builder.Services.AddScoped<IProductService, ProductServiceDB>();
             var app = builder.Build();
 
             if (!app.Environment.IsDevelopment())

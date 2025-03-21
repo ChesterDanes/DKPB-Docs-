@@ -33,8 +33,5 @@ namespace BLL.ServiceInterfaces.Interfaces
 
         Task RemoveFromCartAsync(int productId, int userId);
 
-        
-
-        
     }
 }

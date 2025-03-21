@@ -10,9 +10,9 @@ namespace Cw2.Controllers
     [ApiController]
     public class OrderController : ControllerBase
     {
-        private readonly OrderService _orderService;
+        private readonly IOrderService _orderService;
 
-        public OrderController(OrderService orderService)
+        public OrderController(IOrderService orderService)
         {
             _orderService = orderService;
         }
