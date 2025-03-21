@@ -1,0 +1,217 @@
+Get:
+
+CREATE PROCEDURE GetProducts
+    @NameFilter NVARCHAR(100) = NULL,
+    @GroupNameFilter NVARCHAR(100) = NULL,
+    @GroupIdFilter INT = NULL,
+    @IncludeInactive BIT = 0,
+    @SortBy NVARCHAR(50) = 'Name',
+    @Ascending BIT = 1
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Dynamiczne tworzenie zapytania z sortowaniem i filtrami
+    DECLARE @Sql NVARCHAR(MAX);
+    SET @Sql = 'SELECT p.Id, p.Name, p.Price, p.Image, p.IsActive, g.Name AS GroupName
+                FROM Products p
+                JOIN ProductGroups g ON p.GroupID = g.Id
+                WHERE 1=1';
+
+    -- Dodanie filtrów
+    IF @NameFilter IS NOT NULL
+        SET @Sql = @Sql + ' AND p.Name LIKE ''%' + @NameFilter + '%''';
+
+    IF @GroupNameFilter IS NOT NULL
+        SET @Sql = @Sql + ' AND g.Name LIKE ''%' + @GroupNameFilter + '%''';
+
+    IF @GroupIdFilter IS NOT NULL
+        SET @Sql = @Sql + ' AND p.GroupID = @GroupIdFilter';
+
+    IF @IncludeInactive = 0
+        SET @Sql = @Sql + ' AND p.IsActive = 1';
+
+    -- Dodanie sortowania
+    SET @Sql = @Sql + ' ORDER BY ' + @SortBy;
+    IF @Ascending = 0
+        SET @Sql = @Sql + ' DESC';
+END;
+
+Create:
+
+CREATE PROCEDURE AddProduct
+    @Name NVARCHAR(100),
+    @Price DECIMAL(18, 2),
+    @Image NVARCHAR(255),
+    @GroupId INT,
+    @IsActive BIT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Products (Name, Price, Image, GroupID, IsActive)
+    VALUES (@Name, @Price, @Image, @GroupId, @IsActive);
+END;
+
+Deactivate:
+
+CREATE PROCEDURE DeactivateProduct
+    @ProductId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Products
+    SET IsActive = 0
+    WHERE Id = @ProductId;
+END;
+
+Activate:
+
+CREATE PROCEDURE ActivateProduct
+    @ProductId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE Products
+    SET IsActive = 1
+    WHERE Id = @ProductId;
+END;
+
+Remove from basket:
+
+CREATE TRIGGER trg_AfterProductRemovedFromBasket
+ON BasketPositions
+AFTER DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ProductId INT;
+    DECLARE @UserId INT;
+
+    -- Pobranie danych usuniętego rekordu
+    SELECT @ProductId = ProductID, @UserId = UserID FROM deleted;
+
+    -- Dodatkowa logika, np. zapisywanie logu
+    PRINT 'Produkt o ID ' + CAST(@ProductId AS NVARCHAR(10)) + ' został usunięty z koszyka użytkownika o ID ' + CAST(@UserId AS NVARCHAR(10));
+
+    -- Można dodać logikę do wykonywania dodatkowych operacji, jak np. zapisywanie w tabeli logów
+END;
+
+Add to basket:
+
+CREATE PROCEDURE AddToBasket
+    @ProductId INT,
+    @UserId INT,
+    @Amount INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Dodanie nowego produktu do koszyka
+    INSERT INTO BasketPositions (ProductID, UserID, Amount)
+    VALUES (@ProductId, @UserId, @Amount);
+END;
+
+Update Amount:
+
+CREATE PROCEDURE UpdateProductAmountInBasket
+    @ProductId INT,
+    @UserId INT,
+    @Amount INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Zmiana ilości produktu w koszyku
+    UPDATE BasketPositions
+    SET Amount = @Amount
+    WHERE ProductID = @ProductId AND UserID = @UserId;
+END;
+
+Generate order:
+
+CREATE PROCEDURE GenerateOrder
+    @UserID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Deklaracja zmiennych
+    DECLARE @TotalValue DECIMAL(18,2);
+    DECLARE @OrderID INT;
+
+    -- Pobranie produktów z koszyka użytkownika
+    SELECT @TotalValue = SUM(bp.Amount * p.Price)
+    FROM BasketPositions bp
+    JOIN Products p ON bp.ProductID = p.ID
+    WHERE bp.UserID = @UserID;
+
+    IF @TotalValue = 0
+    BEGIN
+        -- Jeśli koszyk jest pusty, kończymy procedurę
+        PRINT 'Koszyk jest pusty. Nie można utworzyć zamówienia.';
+        RETURN;
+    END;
+
+    -- Tworzenie nowego zamówienia
+    INSERT INTO Orders (UserID, Date, Value, IsPaid)
+    VALUES (@UserID, GETDATE(), @TotalValue, 0);
+
+    -- Pobranie ID nowo utworzonego zamówienia
+    SET @OrderID = SCOPE_IDENTITY();
+
+    -- Dodanie pozycji do zamówienia
+    INSERT INTO OrderPositions (OrderID, ProductID, Amount)
+    SELECT @OrderID, bp.ProductID, bp.Amount
+    FROM BasketPositions bp
+    WHERE bp.UserID = @UserID;
+
+    -- Usunięcie produktów z koszyka
+    DELETE FROM BasketPositions WHERE UserID = @UserID;
+
+    PRINT 'Zamówienie zostało utworzone. ID zamówienia: ' + CAST(@OrderID AS NVARCHAR(10));
+END;
+
+Pay order:
+
+CREATE PROCEDURE PayOrder
+    @OrderID INT,
+    @AmountPaid DECIMAL(18,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Zmienna przechowująca wartość zamówienia
+    DECLARE @OrderValue DECIMAL(18,2);
+
+    -- Pobranie sumy wartości zamówienia na podstawie pozycji zamówienia
+    SELECT @OrderValue = SUM(op.Amount * p.Price)
+    FROM OrderPositions op
+    JOIN Products p ON op.ProductID = p.ID
+    WHERE op.OrderID = @OrderID;
+
+    IF @OrderValue IS NULL
+    BEGIN
+        -- Jeśli zamówienie nie istnieje lub nie ma pozycji
+        PRINT 'Zamówienie o podanym ID nie istnieje lub nie zawiera pozycji.';
+        RETURN;
+    END
+
+    -- Sprawdzanie, czy zapłacona kwota jest równa wartości zamówienia
+    IF @AmountPaid != @OrderValue
+    BEGIN
+        -- Jeśli zapłacona kwota jest inna od wartości zamówienia
+        PRINT 'Zapłacona kwota jest inna od wartości zamówienia. Wartość zamówienia to: ' + CAST(@OrderValue AS NVARCHAR(10));
+        RETURN;
+    END
+
+    -- Aktualizacja statusu płatności w zamówieniu
+    UPDATE Orders
+    SET IsPaid = 1
+    WHERE ID = @OrderID;
+
+    PRINT 'Zamówienie zostało opłacone. ID zamówienia: ' + CAST(@OrderID AS NVARCHAR(10));
+END;

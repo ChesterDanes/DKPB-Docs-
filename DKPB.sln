@@ -19,7 +19,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BLL_DB", "BLL_DB\BLL_DB.csp
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SkryptSQL", "SkryptSQL", "{3BF4C82D-EAF2-4146-A456-558D7EAC57FF}"
 	ProjectSection(SolutionItems) = preProject
-		..\SQL PB78.txt = ..\SQL PB78.txt
+		SQL PB78.txt = SQL PB78.txt
 	EndProjectSection
 EndProject
 Global
